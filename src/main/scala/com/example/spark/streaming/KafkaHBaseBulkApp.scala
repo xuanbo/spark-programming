@@ -120,7 +120,7 @@ object KafkaHBaseBulkApp {
         val table = conn.getTable(TableName.valueOf("test_bo"))
         // 批量写入
         import scala.collection.JavaConversions.seqAsJavaList
-        table.put(seqAsJavaList(puts.toList))
+        table.put(puts.toList)
         // 关闭
         table.close()
         conn.close()
