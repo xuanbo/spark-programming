@@ -106,3 +106,33 @@ def consume(stream: InputDStream[ConsumerRecord[String, String]]): Unit = {
 ```
 
 备注: **性能快了一大截，略快于批量**，实际中还需更精确的测试。
+
+
+## spark-sql
+
+### 连接hive
+
+经过测试，HDP集群中，只需要添加`hive.metastore.uris`即可访问hive集群
+
+```scala
+val spark = SparkSession
+  .builder()
+  .appName("HiveApp")
+  // 加这个配置访问集群中的hive
+  .config("hive.metastore.uris", "thrift://crpprdap25:9083")
+  .enableHiveSupport()
+  .getOrCreate()
+
+// 执行sql
+spark.sql("show databases").show()
+```
+
+注意需要添加`spark-hive`依赖：
+
+```xml
+<dependency>
+    <groupId>org.apache.spark</groupId>
+    <artifactId>spark-hive_2.11</artifactId>
+    <version>${spark.version}</version>
+</dependency>
+```
