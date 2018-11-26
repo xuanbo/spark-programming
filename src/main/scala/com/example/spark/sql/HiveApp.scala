@@ -64,14 +64,14 @@ object HiveApp {
     // ...
 
     // You can also use DataFrames to create temporary views within a SparkSession.
-    case class Record(key: Int, value: String)
-
     val recordsDF = spark.createDataFrame((1 to 100).map(i => Record(i, s"val_$i")))
     recordsDF.createOrReplaceTempView("records")
 
     // Queries can then join DataFrame data with data stored in Hive.
     spark.sql("SELECT * FROM records r JOIN src s ON r.key = s.key").show()
   }
+
+  case class Record(key: Int, value: String)
 
 }
 

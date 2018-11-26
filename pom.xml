@@ -26,6 +26,7 @@
         <scala.logging.version>3.9.0</scala.logging.version>
         <spark.version>2.1.0</spark.version>
         <hbase.version>1.4.8</hbase.version>
+        <mysql.version>5.1.40</mysql.version>
     </properties>
 
     <dependencies>
@@ -77,6 +78,11 @@
             <groupId>org.apache.hbase</groupId>
             <artifactId>hbase-server</artifactId>
             <version>${hbase.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>${mysql.version}</version>
         </dependency>
     </dependencies>
 
