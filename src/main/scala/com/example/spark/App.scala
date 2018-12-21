@@ -1,7 +1,6 @@
 package com.example.spark
 
-import com.typesafe.scalalogging.Logger
-import org.slf4j.LoggerFactory
+import org.apache.spark.{SparkConf, SparkContext}
 
 /**
   * App
@@ -11,10 +10,13 @@ import org.slf4j.LoggerFactory
   */
 object App {
 
-  private val log = Logger(LoggerFactory.getLogger(App.getClass))
-
   def main(args: Array[String]): Unit = {
-    log.info("Hello World")
+    val conf = new SparkConf().setAppName("App").setMaster("local[2]")
+    val sc = new SparkContext(conf)
+    sc.parallelize(Array(1, 2, 3, 4, 5))
+      .map(_ * 2)
+      .saveAsTextFile("/user/hue/sparkcode/appResult")
+    sc.stop()
   }
 
 }
