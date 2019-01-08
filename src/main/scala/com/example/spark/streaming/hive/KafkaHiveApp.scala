@@ -1,25 +1,32 @@
-package com.example.spark.streaming
+package com.example.spark.streaming.hive
 
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.hbase.client.{ConnectionFactory, Put}
-import org.apache.hadoop.hbase.util.Bytes
-import org.apache.hadoop.hbase.{HBaseConfiguration, TableName}
+import com.example.spark.streaming.KafkaConsumerApp
+import com.typesafe.scalalogging.Logger
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.spark.SparkConf
+import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.spark.streaming.{Seconds, StreamingContext}
 import org.apache.spark.streaming.dstream.InputDStream
 import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
-import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
 import org.apache.spark.streaming.kafka010.{CanCommitOffsets, HasOffsetRanges, KafkaUtils}
-import org.apache.spark.streaming.{Seconds, StreamingContext}
+import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
+import org.slf4j.LoggerFactory
 
 /**
-  * 消费kafka数据，每个分区一个连接、批量写入HBase
+  * 消费kafka数据，写入hive
   *
   * @author 奔波儿灞
   * @since 1.0
   */
-object KafkaHBaseBulkApp {
+object KafkaHiveApp {
+
+  private val log = Logger(LoggerFactory.getLogger(KafkaConsumerApp.getClass))
+
+  /**
+    * spark conf
+    */
+  private val conf = new SparkConf().setMaster("local[2]").setAppName("KafkaHiveApp")
 
   /**
     * 每3s一批数据
@@ -43,45 +50,16 @@ object KafkaHBaseBulkApp {
     */
   private val topics = Array("bobo")
 
-  /**
-    * HBase配置
-    */
-  private val conf = createHBaseConf
-
   def main(args: Array[String]): Unit = {
     // 创建SparkContext
-    val ssc = createSparkContext()
+    val ssc = new StreamingContext(conf, batchDuration)
+    val sparkSession = getOrCreateSparkSession()
     // 创建kafka流
     val stream = createKafkaStream(ssc)
     // 消费
-    consume(stream)
+    consume(stream, sparkSession)
     // 启动并等待
     startAndWait(ssc)
-  }
-
-  /**
-    * 创建HBase配置
-    *
-    * @return Configuration
-    */
-  def createHBaseConf: Configuration = {
-    val conf = HBaseConfiguration.create()
-    conf.set("hbase.zookeeper.quorum", "crpprdap25,crpprdap26,crpprdap27")
-    conf.set("hbase.zookeeper.property.clientPort", "2181")
-    conf.set("hbase.defaults.for.version.skip", "true")
-    conf.set("zookeeper.znode.parent", "/hbase-unsecure")
-    conf
-  }
-
-  /**
-    * 创建parkContext
-    *
-    * @return StreamingContext
-    */
-  def createSparkContext(): StreamingContext = {
-    val conf = new SparkConf().setMaster("local[2]").setAppName("KafkaHBaseBulkApp")
-    val ssc = new StreamingContext(conf, batchDuration)
-    ssc
   }
 
   /**
@@ -104,30 +82,37 @@ object KafkaHBaseBulkApp {
     *
     * @param stream InputDStream
     */
-  def consume(stream: InputDStream[ConsumerRecord[String, String]]): Unit = {
+  def consume(stream: InputDStream[ConsumerRecord[String, String]], sparkSession: SparkSession): Unit = {
     stream.foreachRDD { rdd =>
       // 获取offset信息
       val offsetRanges = rdd.asInstanceOf[HasOffsetRanges].offsetRanges
-      // 转化成put，然后批量写入
-      rdd.map { record =>
-        val rowId = record.key()
-        val put = new Put(Bytes.toBytes(rowId))
-        put.addColumn(Bytes.toBytes("info"), Bytes.toBytes("value"), Bytes.toBytes(record.value()))
-        put
-      }.foreachPartition { puts =>
-        // 创建HBase连接
-        val conn = ConnectionFactory.createConnection(conf)
-        val table = conn.getTable(TableName.valueOf("test_bo"))
-        // 批量写入
-        import scala.collection.JavaConversions.seqAsJavaList
-        table.put(puts.toList)
-        // 关闭
-        table.close()
-        conn.close()
-      }
+
+      import sparkSession.implicits.newStringEncoder
+      import sparkSession.implicits.rddToDatasetHolder
+      // 写入Hive表，指定压缩格式。发现可以自动创建表
+      val df = rdd.map(_.value()).toDF("value")
+      df.write.mode(SaveMode.Append).format("orc").saveAsTable("test")
+
       // 异步提交offset
       stream.asInstanceOf[CanCommitOffsets].commitAsync(offsetRanges)
     }
+  }
+
+  /**
+    * 获取或创建SparkSession
+    *
+    * @return SparkSession
+    */
+  def getOrCreateSparkSession(): SparkSession = {
+    val spark = SparkSession
+      .builder()
+      .config(conf)
+      // 加这个配置访问集群中的hive
+      // https://stackoverflow.com/questions/39201409/how-to-query-data-stored-in-hive-table-using-sparksession-of-spark2
+      .config("hive.metastore.uris", "thrift://crpprdap25:9083")
+      .enableHiveSupport()
+      .getOrCreate()
+    spark
   }
 
   /**

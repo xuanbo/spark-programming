@@ -1,4 +1,4 @@
-package com.example.spark.sql
+package com.example.spark.sql.hive
 
 import org.apache.spark.sql.{SaveMode, SparkSession}
 

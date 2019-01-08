@@ -1,7 +1,6 @@
-package com.example.spark.sql
+package com.example.spark.sql.hive
 
 import org.apache.spark.sql.{Row, SparkSession}
-
 
 /**
   * 访问hive表
@@ -74,5 +73,3 @@ object HiveApp {
   case class Record(key: Int, value: String)
 
 }
-
-

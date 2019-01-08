@@ -1,9 +1,12 @@
-package com.example.spark.streaming
+package com.example.spark.streaming.hbase
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.hbase.client.{ConnectionFactory, Put}
+import org.apache.hadoop.hbase.HBaseConfiguration
+import org.apache.hadoop.hbase.client.{Put, Result}
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable
+import org.apache.hadoop.hbase.mapreduce.TableOutputFormat
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.hadoop.hbase.{HBaseConfiguration, TableName}
+import org.apache.hadoop.mapreduce.Job
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.spark.SparkConf
@@ -14,12 +17,12 @@ import org.apache.spark.streaming.kafka010.{CanCommitOffsets, HasOffsetRanges, K
 import org.apache.spark.streaming.{Seconds, StreamingContext}
 
 /**
-  * 消费kafka数据，每个分区一个连接、单条写入HBase
+  * 消费kafka数据，每个分区一个连接、使用saveAsNewAPIHadoopDataset直接写HBase
   *
   * @author 奔波儿灞
   * @since 1.0
   */
-object KafkaHBaseApp {
+object KafkaHBaseUseSaveAsNewAPIHadoopDatasetApp {
 
   /**
     * 每3s一批数据
@@ -60,7 +63,7 @@ object KafkaHBaseApp {
     * @return StreamingContext
     */
   def createSparkContext(): StreamingContext = {
-    val conf = new SparkConf().setMaster("local[2]").setAppName("KafkaHBaseApp")
+    val conf = new SparkConf().setMaster("local[2]").setAppName("KafkaHBaseUseSaveAsNewAPIHadoopDatasetApp")
     val ssc = new StreamingContext(conf, batchDuration)
     ssc
   }
@@ -86,28 +89,23 @@ object KafkaHBaseApp {
     * @param stream InputDStream
     */
   def consume(stream: InputDStream[ConsumerRecord[String, String]]): Unit = {
+    val conf = createHBaseConf
+    val job = Job.getInstance(conf)
+    job.setOutputKeyClass(classOf[ImmutableBytesWritable])
+    job.setOutputValueClass(classOf[Result])
+    job.setOutputFormatClass(classOf[TableOutputFormat[ImmutableBytesWritable]])
+
     stream.foreachRDD { rdd =>
       // 获取offset信息
       val offsetRanges = rdd.asInstanceOf[HasOffsetRanges].offsetRanges
-      // 对每个分区进行处理
-      rdd.foreachPartition { records =>
-        // 创建HBase连接
-        val conf = createHBaseConf
-        val conn = ConnectionFactory.createConnection(conf)
-        // 消费，写入HBase
-        records.foreach { record =>
-          val table = conn.getTable(TableName.valueOf("test_bo"))
-          // key作为row id
-          val rowId = record.key()
-          val put = new Put(Bytes.toBytes(rowId))
-          put.addColumn(Bytes.toBytes("info"), Bytes.toBytes("value"), Bytes.toBytes(record.value()))
-          table.put(put)
-          // 关闭
-          table.close()
-        }
-        // 关闭
-        conn.close()
-      }
+
+      rdd.map { record =>
+        val rowId = record.key()
+        val put = new Put(Bytes.toBytes(rowId))
+        put.addColumn(Bytes.toBytes("info"), Bytes.toBytes("value"), Bytes.toBytes(record.value()))
+        (new ImmutableBytesWritable, put)
+      }.saveAsNewAPIHadoopDataset(job.getConfiguration)
+
       // 异步提交offset
       stream.asInstanceOf[CanCommitOffsets].commitAsync(offsetRanges)
     }
@@ -124,6 +122,7 @@ object KafkaHBaseApp {
     conf.set("hbase.zookeeper.property.clientPort", "2181")
     conf.set("hbase.defaults.for.version.skip", "true")
     conf.set("zookeeper.znode.parent", "/hbase-unsecure")
+    conf.set(TableOutputFormat.OUTPUT_TABLE, "test_bo")
     conf
   }
 

@@ -1,4 +1,4 @@
-package com.example.spark.sql
+package com.example.spark.sql.jdbc
 
 import java.util.Properties
 
