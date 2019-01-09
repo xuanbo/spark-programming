@@ -18,7 +18,8 @@ object HiveDynamicPartitionApp {
     spark.sqlContext.setConf("hive.exec.dynamic.partition", "true")
     spark.sqlContext.setConf("hive.exec.dynamic.partition.mode", "nonstrict")
 
-    import spark.implicits._
+    import spark.implicits.newProductEncoder
+    import spark.implicits.localSeqToDatasetHolder
 
     val df = Seq(
       (1, "First Value","2010-01-01"),
