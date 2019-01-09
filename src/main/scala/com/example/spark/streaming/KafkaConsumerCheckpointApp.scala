@@ -64,7 +64,7 @@ object KafkaConsumerCheckpointApp {
     * @return StreamingContext
     */
   def createSparkContext(): StreamingContext = {
-    val conf = new SparkConf().setMaster("local[2]").setAppName("kafkaConsumerCheckpointApp")
+    val conf = new SparkConf().setMaster("local[2]").setAppName("KafkaConsumerCheckpointApp")
     // 设置WAL，将receiver获取数据的存储级别修改为StorageLevel.MEMORY_AND_DISK_SER
     conf.set("spark.streaming.receiver.writeAheadLog.enable", "true")
     // 创建StreamingContext

@@ -22,7 +22,7 @@ object HiveDynamicPartitionApp {
     import spark.implicits.localSeqToDatasetHolder
 
     val df = Seq(
-      (1, "First Value","2010-01-01"),
+      (1, "First Value", "2010-01-01"),
       (2, "Second Value", "2010-02-01")
     ).toDF("num", "name", "date_d")
 
