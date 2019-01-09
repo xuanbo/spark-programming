@@ -4,19 +4,20 @@ import com.typesafe.scalalogging.Logger
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.spark.SparkConf
-import org.apache.spark.streaming.{Seconds, StreamingContext}
 import org.apache.spark.streaming.dstream.InputDStream
-import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
 import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
+import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
 import org.apache.spark.streaming.kafka010.{CanCommitOffsets, HasOffsetRanges, KafkaUtils}
+import org.apache.spark.streaming.{Seconds, StreamingContext}
 import org.slf4j.LoggerFactory
 
 /**
-  * 消费kafka
+  * 消费kafka，并开启checkpoint，WAL，ShutdownHook
+  * https://www.iteblog.com/archives/1716.html
   */
-object KafkaConsumerApp {
+object KafkaConsumerCheckpointApp {
 
-  private val log = Logger(LoggerFactory.getLogger(KafkaConsumerApp.getClass))
+  private val log = Logger(LoggerFactory.getLogger(KafkaConsumerCheckpointApp.getClass))
 
   /**
     * 每3s一批数据
@@ -43,12 +44,18 @@ object KafkaConsumerApp {
   def main(args: Array[String]): Unit = {
     // 创建SparkContext
     val ssc = createSparkContext()
+    // 开启checkpoint
+    ssc.checkpoint("/spark-checkpoint/kafkaConsumerCheckpointApp")
     // 创建kafka流
     val stream = createKafkaStream(ssc)
     // 消费
     consume(stream)
     // 启动并等待
     startAndWait(ssc)
+    // 在确认所有receiver都关闭的情况下才终止程序
+    sys.addShutdownHook({
+      ssc.stop(stopSparkContext = true, stopGracefully = true)
+    })
   }
 
   /**
@@ -57,7 +64,10 @@ object KafkaConsumerApp {
     * @return StreamingContext
     */
   def createSparkContext(): StreamingContext = {
-    val conf = new SparkConf().setMaster("local[2]").setAppName("KafkaConsumerApp")
+    val conf = new SparkConf().setMaster("local[2]").setAppName("kafkaConsumerCheckpointApp")
+    // 设置WAL，将receiver获取数据的存储级别修改为StorageLevel.MEMORY_AND_DISK_SER
+    conf.set("spark.streaming.receiver.writeAheadLog.enable", "true")
+    // 创建StreamingContext
     val ssc = new StreamingContext(conf, batchDuration)
     ssc
   }
