@@ -322,12 +322,15 @@ object KafkaConsumerOffsetApp {
       // 获取offset信息
       val offsetRanges = rdd.asInstanceOf[HasOffsetRanges].offsetRanges
 
-      val jedis = InternalRedisClient.getResource
-      val pipeline = jedis.pipelined()
-      pipeline.multi()
-
       // 计算相关指标，这里就统计下条数了
       val total = rdd.count()
+
+      val jedis = InternalRedisClient.getResource
+      val pipeline = jedis.pipelined()
+      // 会阻塞redis
+      pipeline.multi()
+
+      // 更新相关指标
       pipeline.incrBy("totalRecords", total)
 
       // 更新offset
@@ -337,6 +340,7 @@ object KafkaConsumerOffsetApp {
         pipeline.set(topicPartitionKey, offsetRange.untilOffset + "")
       }
 
+      // 执行，释放
       pipeline.exec()
       pipeline.sync()
       pipeline.close()
