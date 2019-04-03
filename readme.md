@@ -326,13 +326,9 @@ object KafkaConsumerOffsetApp {
       val pipeline = jedis.pipelined()
       pipeline.multi()
 
-      // 对每个分区进行处理，这里保存信息到redis
-      rdd.foreachPartition { records =>
-        records.foreach { record =>
-          log.info("partition: {}, offset: {}, key: {}, value: {}", record.partition, record.offset, record.key, record.value)
-          pipeline.set(record.key, record.value)
-        }
-      }
+      // 计算相关指标，这里就统计下条数了
+      val total = rdd.count()
+      pipeline.incrBy("totalRecords", total)
 
       // 更新offset
       offsetRanges.foreach { offsetRange =>
@@ -369,6 +365,8 @@ object KafkaConsumerOffsetApp {
 * `consume`消费完数据后，将offset提交到redis
 
 参考：[实时流计算、Spark Streaming、Kafka、Redis、Exactly-once、实时去重](http://lxw1234.com/archives/2018/02/901.htm)
+
+核心是利用redis的`pipeline`、`multi`来保证spark streaming的计算结果写入redis是原子性。
 
 ## spark-sql
 

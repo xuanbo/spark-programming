@@ -139,13 +139,9 @@ object KafkaConsumerOffsetApp {
       val pipeline = jedis.pipelined()
       pipeline.multi()
 
-      // 对每个分区进行处理，这里保存信息到redis
-      rdd.foreachPartition { records =>
-        records.foreach { record =>
-          log.info("partition: {}, offset: {}, key: {}, value: {}", record.partition, record.offset, record.key, record.value)
-          pipeline.set(record.key, record.value)
-        }
-      }
+      // 计算相关指标，这里就统计下条数了
+      val total = rdd.count()
+      pipeline.incrBy("totalRecords", total)
 
       // 更新offset
       offsetRanges.foreach { offsetRange =>
