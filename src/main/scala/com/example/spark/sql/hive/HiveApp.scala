@@ -15,8 +15,9 @@ object HiveApp {
       .builder()
       .appName("HiveApp")
       // 加这个配置访问集群中的hive
-      // https://stackoverflow.com/questions/39201409/how-to-query-data-stored-in-hive-table-using-sparksession-of-spark2
-      .config("hive.metastore.uris", "thrift://crpprdap25:9083")
+      .config("hive.metastore.uris", "thrift://hdp02:9083")
+      .config("spark.sql.warehouse.dir", "/data/warehouse/tablespace/managed/hive")
+      .config("metastore.catalog.default", "hive")
       .enableHiveSupport()
       .getOrCreate()
 

@@ -11,7 +11,9 @@ object HiveDynamicPartitionApp {
   def main(args: Array[String]): Unit = {
     val spark = SparkSession.builder()
       .appName("HiveApp")
-      .config("hive.metastore.uris", "thrift://crpprdap01:9083")
+      .config("hive.metastore.uris", "thrift://hdp02:9083")
+      .config("spark.sql.warehouse.dir", "/data/warehouse/tablespace/managed/hive")
+      .config("metastore.catalog.default", "hive")
       .enableHiveSupport()
       .getOrCreate()
 

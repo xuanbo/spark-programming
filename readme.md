@@ -1,6 +1,6 @@
 # 说明
 
-> 基于scala 2.11、spark 2.1.0
+> 基于scala 2.11、spark 2.3.2
 
 ## spark-streaming
 
@@ -376,7 +376,7 @@ object KafkaConsumerOffsetApp {
 
 ### 连接hive
 
-经过测试，HDP集群中，只需要添加`hive.metastore.uris`即可访问hive集群
+经过测试，HDP集群中，需要添加`hive.metastore.uris`、`spark.sql.warehouse.dir`、`metastore.catalog.default`即可访问hive集群
 
 ```scala
 val spark = SparkSession
@@ -384,6 +384,8 @@ val spark = SparkSession
   .appName("HiveApp")
   // 加这个配置访问集群中的hive
   .config("hive.metastore.uris", "thrift://crpprdap25:9083")
+  .config("spark.sql.warehouse.dir", "/data/warehouse/tablespace/managed/hive")
+  .config("metastore.catalog.default", "hive")
   .enableHiveSupport()
   .getOrCreate()
 
